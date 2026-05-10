@@ -8,7 +8,7 @@ This project demonstrates core game design logic, state management, DOM manipula
 
 ## 🎮 Demo
 
-> **Play it live:** (https://kellernz1.github.io/battle-arena/)
+> **Play it live:** https://kellernz1.github.io/battle-arena/
 
 ---
 
