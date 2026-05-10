@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battle Arena</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        /* Tremor na tela ao receber dano */
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        /* Investida (Ataque) */
+        @keyframes lunge-right {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(40px) scale(1.05); }
+            100% { transform: translateX(0); }
+        }
+        @keyframes lunge-left {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(-40px) scale(1.05); }
+            100% { transform: translateX(0); }
+        }
+
+        /* Brilho de Cura/Compra */
+        @keyframes heal-glow {
+            0% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+            50% { box-shadow: 0 0 30px rgba(34, 197, 94, 1); background-color: #1f2937; }
+            100% { box-shadow: 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        
+        @keyframes item-glow {
+            0% { box-shadow: 0 0 0 rgba(234, 179, 8, 0); }
+            50% { box-shadow: 0 0 30px rgba(234, 179, 8, 1); background-color: #374151; }
+            100% { box-shadow: 0 0 0 rgba(234, 179, 8, 0); }
+        }
+
+        .anim-shake { animation: shake 0.4s; }
+        .anim-attack-heroi { animation: lunge-right 0.3s ease-in-out; z-index: 10; }
+        .anim-attack-monstro { animation: lunge-left 0.3s ease-in-out; z-index: 10; }
+        .anim-heal { animation: heal-glow 0.8s ease-out; }
+        .anim-item { animation: item-glow 0.6s ease-out; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col items-center justify-center p-4 overflow-x-hidden">
+
+    <h1 class="text-4xl font-bold mb-8 text-yellow-400 tracking-wider text-center drop-shadow-md">BATTLE ARENA</h1>
+
+    <!-- Arena de Batalha -->
+    <div class="flex flex-col md:flex-row gap-8 w-full max-w-4xl justify-center items-center relative">
+        
+        <!-- Painel do Jogador -->
+        <div id="painel-heroi" class="bg-gray-800 p-6 rounded-lg shadow-lg shadow-blue-500/50 w-full max-w-sm text-center relative transition-colors duration-300">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-2xl font-bold">Herói (Você)</h2>
+                <div class="bg-gray-900 px-3 py-1 rounded-full border border-yellow-500">
+                    <span id="heroi-moedas-texto" class="text-yellow-400 font-black">🪙 0</span>
+                </div>
+            </div>
+            
+            <div class="w-32 h-32 bg-blue-600 mx-auto rounded-full mb-4 flex items-center justify-center text-4xl shadow-inner border-4 border-gray-700">🧙‍♂️</div>
+            
+            <div class="w-full bg-gray-700 rounded-full h-4 mb-2 overflow-hidden border border-gray-600">
+                <div id="heroi-barra" class="bg-green-500 h-full rounded-full transition-all duration-300" style="width: 100%"></div>
+            </div>
+            <p id="heroi-hp-texto" class="text-lg font-mono font-bold">100 / 100 HP</p>
+            <p id="heroi-status-texto" class="text-xs text-gray-400 mt-1">Dano Base: 10-15</p>
+        </div>
+
+        <div class="text-4xl font-black text-red-500 italic drop-shadow-lg z-0">VS</div>
+
+        <!-- Painel do Monstro -->
+        <div id="painel-monstro" class="bg-gray-800 p-6 rounded-lg shadow-lg shadow-red-500/50 w-full max-w-sm text-center relative transition-colors duration-300">
+            <h2 id="monstro-nome" class="text-2xl font-bold mb-2">Carregando...</h2>
+            <div id="monstro-img" class="w-32 h-32 bg-red-600 mx-auto rounded-full mb-4 flex items-center justify-center text-5xl shadow-inner border-4 border-gray-700 transition-transform duration-300 hover:scale-110">👾</div>
+            <div class="w-full bg-gray-700 rounded-full h-4 mb-2 overflow-hidden border border-gray-600">
+                <div id="monstro-barra" class="bg-green-500 h-full rounded-full transition-all duration-300" style="width: 100%"></div>
+            </div>
+            <p id="monstro-hp-texto" class="text-lg font-mono font-bold">-- / -- HP</p>
+        </div>
+    </div>
+
+    <!-- Controles de Combate -->
+    <div class="mt-8 flex flex-wrap gap-4 justify-center" id="controles">
+        <button id="btn-atacar" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded shadow-[0_4px_14px_0_rgba(220,38,38,0.5)] active:scale-95 transition-all">
+            ⚔️ Atacar
+        </button>
+        
+        <button id="btn-especial" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded shadow-[0_4px_14px_0_rgba(147,51,234,0.5)] active:scale-95 transition-all flex flex-col items-center">
+            <span>✨ Especial</span>
+            <small id="cooldown-timer" class="text-xs opacity-80">Pronto</small>
+        </button>
+        
+        <button id="btn-curar" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded shadow-[0_4px_14px_0_rgba(22,163,74,0.5)] active:scale-95 transition-all">
+            🧪 Curar
+        </button>
+    </div>
+
+    <!-- Interface de Vitória / Loja -->
+    <div class="mt-6 hidden w-full max-w-2xl flex-col items-center gap-6" id="controles-vitoria">
+        
+        <!-- Loja -->
+        <div class="w-full bg-gray-800 p-4 rounded-lg border border-yellow-600 shadow-[0_0_15px_rgba(202,138,4,0.3)]">
+            <h3 class="text-center text-yellow-400 font-bold text-xl mb-4 border-b border-gray-700 pb-2">🛒 Mercador Errante</h3>
+            <div class="flex flex-wrap justify-center gap-4">
+                <button onclick="comprarItem('cura', 15)" class="flex-1 min-w-[140px] bg-gray-700 hover:bg-gray-600 p-3 rounded border border-gray-500 text-sm flex flex-col items-center transition-all hover:border-yellow-400">
+                    <span class="text-2xl mb-1">🍎</span>
+                    <span class="font-bold">Fruta dos Deuses</span>
+                    <span class="text-green-400 text-xs my-1">+50 HP</span>
+                    <span class="bg-gray-900 px-2 py-1 rounded text-yellow-400 font-bold w-full text-center mt-1">🪙 15</span>
+                </button>
+                <button onclick="comprarItem('ataque', 30)" class="flex-1 min-w-[140px] bg-gray-700 hover:bg-gray-600 p-3 rounded border border-gray-500 text-sm flex flex-col items-center transition-all hover:border-yellow-400">
+                    <span class="text-2xl mb-1">🗡️</span>
+                    <span class="font-bold">Treinamento</span>
+                    <span class="text-red-400 text-xs my-1">+5 Dano Base</span>
+                    <span class="bg-gray-900 px-2 py-1 rounded text-yellow-400 font-bold w-full text-center mt-1">🪙 30</span>
+                </button>
+                <button onclick="comprarItem('vida', 30)" class="flex-1 min-w-[140px] bg-gray-700 hover:bg-gray-600 p-3 rounded border border-gray-500 text-sm flex flex-col items-center transition-all hover:border-yellow-400">
+                    <span class="text-2xl mb-1">🛡️</span>
+                    <span class="font-bold">Aura Espiritual</span>
+                    <span class="text-blue-400 text-xs my-1">+20 HP Máximo</span>
+                    <span class="bg-gray-900 px-2 py-1 rounded text-yellow-400 font-bold w-full text-center mt-1">🪙 30</span>
+                </button>
+            </div>
+        </div>
+
+        <button id="btn-proximo" class="bg-yellow-500 hover:bg-yellow-400 text-gray-900 font-black py-3 px-12 rounded shadow-[0_4px_14px_0_rgba(234,179,8,0.5)] hover:scale-105 active:scale-95 transition-all animate-bounce text-xl">
+            ➡️ AVANÇAR
+        </button>
+    </div>
+
+    <!-- Log de Batalha -->
+    <div class="mt-8 bg-gray-800 w-full max-w-2xl p-4 rounded-lg border-2 border-gray-700 h-48 overflow-y-auto font-mono text-sm shadow-inner" id="battle-log">
+        <p class="text-gray-400 italic mb-2">Sistema inicializado. A batalha vai começar...</p>
+    </div>
+
+    <script>
+        // --- Dados dos Monstros Originais ---
+        const monstros = [
+            { nome: "Slime Rastejante", hp: 50, ataqueMin: 5, ataqueMax: 10, emoji: "🦠", recompensa: 25 },
+            { nome: "Esqueleto Amaldiçoado", hp: 90, ataqueMin: 10, ataqueMax: 18, emoji: "💀", recompensa: 45 },
+            { nome: "Dragão das Sombras", hp: 250, ataqueMin: 20, ataqueMax: 35, emoji: "🐉", recompensa: 100 }
+        ];
+
+        // --- Estado do Jogador & Jogo ---
+        let monstroAtualIndex = 0;
+        let heroiMaxHP = 100;
+        let heroiHP = 100;
+        let moedas = 0;           
+        let bonusDanoBase = 0;    
+        
+        let monstroHP = 0;
+        let monstroMaxHP = 0;
+        let turnoDoJogador = true;
+        let cooldownEspecial = 0; 
+        const COOLDOWN_MAX = 3;
+
+        // --- Elementos DOM ---
+        const painelHeroi = document.getElementById('painel-heroi');
+        const painelMonstro = document.getElementById('painel-monstro');
+        const heroiBarra = document.getElementById('heroi-barra');
+        const heroiHpTexto = document.getElementById('heroi-hp-texto');
+        const heroiStatusTexto = document.getElementById('heroi-status-texto');
+        const heroiMoedasTexto = document.getElementById('heroi-moedas-texto');
+        
+        const monstroNome = document.getElementById('monstro-nome');
+        const monstroImg = document.getElementById('monstro-img');
+        const monstroBarra = document.getElementById('monstro-barra');
+        const monstroHpTexto = document.getElementById('monstro-hp-texto');
+        
+        const battleLog = document.getElementById('battle-log');
+        const btnAtacar = document.getElementById('btn-atacar');
+        const btnEspecial = document.getElementById('btn-especial');
+        const btnCurar = document.getElementById('btn-curar');
+        const cooldownTimer = document.getElementById('cooldown-timer');
+        
+        const controles = document.getElementById('controles');
+        const controlesVitoria = document.getElementById('controles-vitoria');
+        const btnProximo = document.getElementById('btn-proximo');
+
+        // --- Funções Auxiliares ---
+        function log(mensagem, cor = "text-white") {
+            const p = document.createElement('p');
+            p.className = `mb-1 border-b border-gray-700 pb-1 ${cor}`;
+            p.innerHTML = `> ${mensagem}`;
+            battleLog.appendChild(p);
+            battleLog.scrollTop = battleLog.scrollHeight;
+        }
+
+        function atualizarInterface() {
+            heroiHpTexto.innerText = `${Math.max(0, heroiHP)} / ${heroiMaxHP} HP`;
+            monstroHpTexto.innerText = `${Math.max(0, monstroHP)} / ${monstroMaxHP} HP`;
+            heroiMoedasTexto.innerText = `🪙 ${moedas}`;
+            heroiStatusTexto.innerText = `Dano Base: ${10 + bonusDanoBase}-${15 + bonusDanoBase}`;
+
+            const hPorcent = (heroiHP / heroiMaxHP) * 100;
+            const mPorcent = (monstroHP / monstroMaxHP) * 100;
+            
+            heroiBarra.style.width = `${Math.max(0, hPorcent)}%`;
+            monstroBarra.style.width = `${Math.max(0, mPorcent)}%`;
+
+            heroiBarra.style.backgroundColor = hPorcent <= 30 ? '#ef4444' : '#22c55e';
+            monstroBarra.style.backgroundColor = mPorcent <= 30 ? '#ef4444' : '#22c55e';
+
+            const botoes = [btnAtacar, btnEspecial, btnCurar];
+            botoes.forEach(btn => {
+                btn.disabled = !turnoDoJogador;
+                btn.classList.toggle('opacity-50', !turnoDoJogador);
+                btn.classList.toggle('cursor-not-allowed', !turnoDoJogador);
+                btn.classList.toggle('grayscale', !turnoDoJogador);
+            });
+
+            if (cooldownEspecial > 0 && turnoDoJogador) {
+                btnEspecial.disabled = true;
+                btnEspecial.classList.add('opacity-50', 'cursor-not-allowed', 'grayscale');
+                cooldownTimer.innerText = `Aguarde ${cooldownEspecial} turnos`;
+            } else if (turnoDoJogador) {
+                cooldownTimer.innerText = "PRONTO!";
+            }
+        }
+
+        function executarAnimacaoAtaque(atacante) {
+            const el = atacante === 'heroi' ? painelHeroi : painelMonstro;
+            const classe = atacante === 'heroi' ? 'anim-attack-heroi' : 'anim-attack-monstro';
+            el.classList.add(classe);
+            setTimeout(() => el.classList.remove(classe), 300);
+        }
+
+        function executarAnimacaoDano(alvo) {
+            const el = alvo === 'heroi' ? painelHeroi : painelMonstro;
+            el.classList.add('anim-shake', 'bg-red-900');
+            setTimeout(() => el.classList.remove('anim-shake', 'bg-red-900'), 400);
+        }
+
+        function executarAnimacao(tipo) {
+            painelHeroi.classList.add(tipo);
+            setTimeout(() => painelHeroi.classList.remove(tipo), 800);
+        }
+
+        // --- Sistema de Loja ---
+        function comprarItem(tipo, preco) {
+            if (moedas < preco) {
+                log("❌ Você não tem moedas suficientes para este item!", "text-red-400 font-bold");
+                executarAnimacaoDano('heroi'); // Tremor de erro
+                return;
+            }
+
+            moedas -= preco;
+
+            if (tipo === 'cura') {
+                heroiHP = Math.min(heroiMaxHP, heroiHP + 50);
+                log("🍎 Fruta dos Deuses consumida! Recuperou 50 HP.", "text-green-400");
+                executarAnimacao('anim-heal');
+            } else if (tipo === 'ataque') {
+                bonusDanoBase += 5;
+                log("🗡️ Treinamento concluído! Dano base aumentado em +5.", "text-yellow-400");
+                executarAnimacao('anim-item');
+            } else if (tipo === 'vida') {
+                heroiMaxHP += 20;
+                heroiHP += 20; // Cura o HP extra que ganhou
+                log("🛡️ Aura Espiritual adquirida! HP Máximo aumentou em +20.", "text-blue-400");
+                executarAnimacao('anim-item');
+            }
+
+            atualizarInterface();
+        }
+
+        // --- Lógica de Combate ---
+        function turnoDoInimigo() {
+            if (monstroHP <= 0) return;
+
+            setTimeout(() => {
+                const monstro = monstros[monstroAtualIndex];
+                const danoInimigo = Math.floor(Math.random() * (monstro.ataqueMax - monstro.ataqueMin + 1)) + monstro.ataqueMin;
+                
+                executarAnimacaoAtaque('monstro');
+                
+                setTimeout(() => {
+                    heroiHP -= danoInimigo;
+                    executarAnimacaoDano('heroi');
+                    log(`O ${monstro.nome} atacou cruelmente! Você perdeu <span class="text-red-500 font-bold">${danoInimigo}</span> de HP.`, "text-red-300");
+                    
+                    if (cooldownEspecial > 0) cooldownEspecial--; 
+                    
+                    turnoDoJogador = true;
+                    if (heroiHP <= 0) {
+                        log("💀 GAME OVER! Seu corpo cai sem vida na arena...", "text-red-600 font-black text-xl uppercase mt-2");
+                        controles.classList.add('hidden');
+                    }
+                    atualizarInterface();
+                }, 150);
+            }, 1200);
+        }
+
+        btnAtacar.addEventListener('click', () => {
+            if (!turnoDoJogador) return;
+            turnoDoJogador = false;
+
+            // Calcula dano usando o Bônus da Loja
+            let baseRandom = Math.floor(Math.random() * 6) + 10; 
+            let dano = baseRandom + bonusDanoBase; 
+            let critico = Math.random() < 0.15; 
+            
+            if (critico) {
+                dano *= 2;
+                log("🔥 ACERTO CRÍTICO! Um golpe limpo e perfeito!", "text-yellow-400 font-bold italic");
+            }
+
+            executarAnimacaoAtaque('heroi');
+            
+            setTimeout(() => {
+                monstroHP -= dano;
+                executarAnimacaoDano('monstro');
+                log(`Você atacou o monstro, causando <span class="text-yellow-400 font-bold">${dano}</span> de dano.`);
+                checarVitoria();
+            }, 150);
+        });
+
+        btnEspecial.addEventListener('click', () => {
+            if (!turnoDoJogador || cooldownEspecial > 0) return;
+            turnoDoJogador = false;
+            
+            // Especial também se beneficia de uma fração do bônus
+            const dano = Math.floor(Math.random() * 21) + 30 + (bonusDanoBase * 2); 
+            cooldownEspecial = COOLDOWN_MAX; 
+
+            executarAnimacaoAtaque('heroi');
+            
+            setTimeout(() => {
+                monstroHP -= dano;
+                executarAnimacaoDano('monstro');
+                battleLog.classList.add('shadow-[inset_0_0_20px_rgba(147,51,234,0.3)]');
+                setTimeout(() => battleLog.classList.remove('shadow-[inset_0_0_20px_rgba(147,51,234,0.3)]'), 1000);
+
+                log(`✨ OMEGA SLASH! Você liberou energia causando <span class="text-purple-400 font-black text-lg">${dano}</span> de dano!`, "text-purple-300");
+                checarVitoria();
+            }, 150);
+        });
+
+        btnCurar.addEventListener('click', () => {
+            if (!turnoDoJogador) return;
+            turnoDoJogador = false;
+
+            const cura = Math.floor(Math.random() * 11) + 20; 
+            heroiHP = Math.min(heroiMaxHP, heroiHP + cura);
+            
+            executarAnimacao('anim-heal');
+            log(`🧪 Você bebeu uma Poção de Vida, restaurando <span class="text-green-400 font-bold">${cura}</span> de HP.`, "text-green-300");
+            
+            atualizarInterface();
+            turnoDoInimigo();
+        });
+
+        function checarVitoria() {
+            atualizarInterface();
+            if (monstroHP <= 0) {
+                const ganho = monstros[monstroAtualIndex].recompensa;
+                moedas += ganho;
+                atualizarInterface(); 
+                
+                log(`✅ VITÓRIA! O ${monstros[monstroAtualIndex].nome} foi derrotado!`, "text-green-400 font-black text-lg mt-2");
+                log(`💰 Você encontrou <span class="text-yellow-400 font-bold">🪙 ${ganho} moedas</span>!`, "text-yellow-200");
+                
+                controles.classList.add('hidden');
+                controlesVitoria.classList.remove('hidden');
+                controlesVitoria.classList.add('flex'); 
+            } else {
+                turnoDoInimigo();
+            }
+        }
+
+        // --- Progressão ---
+        function carregarMonstro() {
+            const m = monstros[monstroAtualIndex];
+            monstroMaxHP = m.hp;
+            monstroHP = m.hp;
+            monstroNome.innerText = m.nome;
+            monstroImg.innerText = m.emoji;
+            
+            controles.classList.remove('hidden');
+            controlesVitoria.classList.add('hidden');
+            controlesVitoria.classList.remove('flex');
+            
+            turnoDoJogador = true;
+            cooldownEspecial = 0; 
+            
+            painelMonstro.classList.add('animate-pulse');
+            setTimeout(() => painelMonstro.classList.remove('animate-pulse'), 1000);
+
+            log(`⚠️ ALERTA: Um ${m.nome} bloqueia seu caminho!`, "text-blue-300 font-bold mt-2 border-t border-gray-700 pt-2");
+            atualizarInterface();
+        }
+
+        btnProximo.addEventListener('click', () => {
+            monstroAtualIndex++;
+            if (monstroAtualIndex < monstros.length) {
+                heroiHP = Math.min(heroiMaxHP, heroiHP + 20); 
+                executarAnimacao('anim-heal');
+                log(`🏕️ Você avançou na jornada e descansou, recuperando 20 HP.`, "text-green-400 italic");
+                carregarMonstro();
+            } else {
+                controlesVitoria.classList.add('hidden');
+                controlesVitoria.classList.remove('flex');
+                log("👑 LENDÁRIO! Você derrotou todos os monstros e sobreviveu à arena!", "text-yellow-400 font-black text-2xl uppercase mt-4 text-center");
+                battleLog.innerHTML += `<button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-500 p-4 rounded font-black text-white shadow-lg transition-transform hover:scale-105 w-full uppercase mt-4">Nova Jornada</button>`;
+                battleLog.scrollTop = battleLog.scrollHeight;
+            }
+        });
+
+        // Start
+        carregarMonstro();
+    </script>
+</body>
+</html>
+
